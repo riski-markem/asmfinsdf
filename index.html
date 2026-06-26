@@ -598,7 +598,7 @@
                             <span class="estimasi-label">💰 Estimasi Ongkos</span>
                             <span class="estimasi-value estimasi-harga" id="txtEstimasiHarga">-</span>
                         </div>
-                        <div class="estimasi-note">*Jarak garis lurus, ongkos riil bisa beda dirembug karo driver</div>
+                        <div class="estimasi-note">*Argo: 1-4 km Rp 8.000, selanjutnya +Rp 2.000/km. Jarak garis lurus, ongkos riil bisa beda dirembug karo driver</div>
                     </div>
                     
                     <div class="form-group">
@@ -1371,7 +1371,7 @@
             dropoff_lng: c2?.lng || null,
             // Estimasi jarak & ongkos (jarak garis lurus, bukan jarak jalan riil)
             jarak_km: jarakKm ? Number(jarakKm.toFixed(1)) : null,
-            estimasi_ongkos: jarakKm ? Math.round(jarakKm * TARIF_PER_KM) : null,
+            estimasi_ongkos: jarakKm ? hitungOngkosArgo(jarakKm) : null,
         };
         
         set(newRef, data).then(() => {
@@ -1394,7 +1394,10 @@
 
     // State
     window._mapCoords = {};         // Simpan koordinat tiap field
-    const TARIF_PER_KM = 2000;      // Rp 2.000/km -- samakan dengan yang ditampilkan di halaman utama
+    // Struktur argo: 1-4 km flat, km ke-5 dst kena tambahan per-km
+    const ARGO_KM_DASAR = 4;          // batas jarak yang kena tarif flat
+    const ARGO_TARIF_DASAR = 8000;    // Rp 8.000 untuk jarak 1-4 km
+    const ARGO_TARIF_TAMBAHAN = 2000; // Rp 2.000 / km untuk tiap km di atas 4 km
     // Layanan yang ongkosnya dihitung per-km. "Bantu Bersih" & "Jasa Lainnya" nego/fleksibel jadi tidak dihitung.
     const LAYANAN_PER_KM = ['Antar Jemput', 'Kirim Barang', 'Titip Belanja'];
     let _pickerMap = null;          // Instance Google Maps
@@ -1701,6 +1704,15 @@
         return 'Rp ' + Math.round(angka).toLocaleString('id-ID');
     }
 
+    // Hitung ongkos pakai struktur argo: 1-4 km flat Rp 8.000, km ke-5 dst +Rp 2.000/km.
+    // Jarak dibulatkan KE ATAS ke km penuh terdekat (gaya argo/meter taksi),
+    // minimal 1 km supaya order jarak sangat pendek tetap kena tarif dasar.
+    function hitungOngkosArgo(jarakKmAsli) {
+        const jarakBulat = Math.max(1, Math.ceil(jarakKmAsli));
+        if (jarakBulat <= ARGO_KM_DASAR) return ARGO_TARIF_DASAR;
+        return ARGO_TARIF_DASAR + (jarakBulat - ARGO_KM_DASAR) * ARGO_TARIF_TAMBAHAN;
+    }
+
     // Tampilkan/sembunyikan kotak jarak & estimasi ongkos.
     // Hanya tampil kalau: layanan saat ini pakai tarif per-km, DAN kedua titik
     // (jemput & tujuan) sudah dipilih lewat peta.
@@ -1718,7 +1730,7 @@
         }
 
         const jarakKm = hitungJarakKm(c1.lat, c1.lng, c2.lat, c2.lng);
-        const ongkos = jarakKm * TARIF_PER_KM;
+        const ongkos = hitungOngkosArgo(jarakKm);
 
         document.getElementById('txtEstimasiJarak').textContent = jarakKm.toFixed(1) + ' km';
         document.getElementById('txtEstimasiHarga').textContent = formatRupiah(ongkos);
